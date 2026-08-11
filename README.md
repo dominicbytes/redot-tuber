@@ -2,7 +2,7 @@
 
 Redot Tuber is a standalone, typed-GDScript YouTube Live addon for Redot. It lets a game use a developer-owned YouTube Data API application, ask a consenting channel owner to connect their account at runtime, receive typed live events, and perform capability-gated YouTube Live actions.
 
-The MS-001 through MS-005 implementation is complete on Redot `26.2.stable.official.4f5b14aba`. It includes:
+This implementation is complete on Redot `26.2.stable.official.4f5b14aba`. It includes:
 
 - public API-key discovery and live-chat reads;
 - Google installed-app OAuth with PKCE, state validation, and an IPv4 loopback callback;
@@ -13,7 +13,7 @@ The MS-001 through MS-005 implementation is complete on Redot `26.2.stable.offic
 - capability/scope checks, explicit destructive-action confirmation, quota budgets, redacted diagnostics, and a bounded optional media cache;
 - a full integration-lab scene covering public and authorized workflows.
 
-This is currently a development build, not a certified stable release. Real Google consent/account-side testing and Linux desktop Secret Service certification remain MS-006 gates. Windows and Linux x86-64 are the initial targets; macOS and ARM64 follow later.
+This is currently a development build, not a certified stable release. Real Google consent/account-side testing and Linux desktop Secret Service certification remain gates. Windows and Linux x86-64 are the initial targets; macOS and ARM64 follow later.
 
 ## Try the integration lab
 
@@ -42,3 +42,17 @@ Never place API keys, OAuth tokens, client secrets, or stream ingestion names in
 Redot Tuber is an independent project inspired by and selectively adapted from generic foundations in [dominicbytes/twitcher](https://github.com/dominicbytes/twitcher), whose original project is [Kani's Twitcher](https://github.com/kanimaru/twitcher). It is a standalone YouTube/Redot addon, has no Twitcher runtime dependency, and is not intended to be merged back into either Twitcher repository.
 
 Redot Tuber is MIT licensed. Original attribution and the pinned donor commit are preserved in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and the [reuse manifest](docs/lineage/twitcher-reuse.md).
+
+## Notes
+
+I vibe coded this in GPT Sol 5.6. Use at your own risk. Actual programmers are welcome to submit PR's and feedback.
+
+## About Dominic Bytes
+
+Greetings! I am Dominic Bytes, the synth walker. I hail from the distant future. Where brains occupy robot bodies, time travel is a trip to the corner store, and the neon glow of our attire is powered by the light of our souls. Join me on a 1.21 gigawatt powered journey of chill vibes with gaming, anime, movies, and more!
+
+- [Website](https://dominicbytes.carrd.co/)
+- [X](https://x.com/DominicBytes)
+- [Twitch](https://www.twitch.tv/dominicbytes)
+- [YouTube](http://www.youtube.com/@DominicBytes)
+- [Kick](https://kick.com/dominicbytes)
