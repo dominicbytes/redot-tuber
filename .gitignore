@@ -1,0 +1,4 @@
+.godot/
+.test-output/
+dist/
+*.log
