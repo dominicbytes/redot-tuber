@@ -1,0 +1,40 @@
+{
+  "kind": "discovery#restDescription",
+  "id": "youtube:v3",
+  "revision": "fixture-2026-08-10",
+  "rootUrl": "https://youtube.googleapis.com/",
+  "servicePath": "youtube/v3/",
+  "resources": {
+    "videos": {
+      "methods": {
+        "list": {
+          "id": "youtube.videos.list",
+          "path": "videos",
+          "httpMethod": "GET",
+          "parameters": {
+            "part": {"type": "string", "required": true},
+            "id": {"type": "string", "required": false}
+          },
+          "scopes": ["https://www.googleapis.com/auth/youtube.readonly"]
+        }
+      }
+    },
+    "liveChatMessages": {
+      "methods": {
+        "list": {
+          "id": "youtube.liveChatMessages.list",
+          "path": "liveChat/messages",
+          "httpMethod": "GET",
+          "parameters": {
+            "liveChatId": {"type": "string", "required": true},
+            "part": {"type": "string", "required": true}
+          },
+          "scopes": [
+            "https://www.googleapis.com/auth/youtube",
+            "https://www.googleapis.com/auth/youtube.readonly"
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "protocol": "RTCH/1",
+  "helpers": {
+    "windows-x86_64": {
+      "path": "windows/x86_64/redot-tuber-credential-helper.exe",
+      "status": "built_and_windows_credential_manager_tested",
+      "sha256": "2936c690c7e9a98b2bd4eae6dbc395bbc7f9127c1ce9a8a1c0dce82427817f05"
+    },
+    "linux-x86_64": {
+      "path": "linux/x86_64/redot-tuber-credential-helper",
+      "status": "built_protocol_tested_secret_service_desktop_certification_pending",
+      "sha256": "1d37de51bee014193cdd4c93e9703d2d2c89a70a9243293c212458c32403a5dd"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "responses": [
+    {
+      "kind":"youtube#liveChatMessageListResponse",
+      "nextPageToken":"fixture-token-1",
+      "pollingIntervalMillis":1500,
+      "items":[
+        {"id":"stream-text","snippet":{"type":"textMessageEvent","liveChatId":"chat-fixture","publishedAt":"2026-08-10T12:00:00Z","displayMessage":"Chunked 🎮 message","textMessageDetails":{"messageText":"Chunked 🎮 message"}},"authorDetails":{"channelId":"channel-viewer","displayName":"Viewer"}}
+      ]
+    },
+    {
+      "kind":"youtube#liveChatMessageListResponse",
+      "nextPageToken":"fixture-token-2",
+      "pollingIntervalMillis":1500,
+      "items":[
+        {"id":"stream-gift","snippet":{"type":"giftEvent","liveChatId":"chat-fixture","publishedAt":"2026-08-10T12:00:01Z","giftEventDetails":{"giftMetadata":{"jewelsAmount":10,"giftName":"Star","comboCount":1}}}}
+      ]
+    },
+    {
+      "kind":"youtube#liveChatMessageListResponse",
+      "nextPageToken":"fixture-token-3",
+      "pollingIntervalMillis":1500,
+      "offlineAt":"2026-08-10T12:00:03Z",
+      "items":[
+        {"id":"stream-gift","snippet":{"type":"giftEvent","liveChatId":"chat-fixture","publishedAt":"2026-08-10T12:00:01Z","giftEventDetails":{"giftMetadata":{"jewelsAmount":20,"giftName":"Star","comboCount":2}}}},
+        {"id":"stream-ended","snippet":{"type":"chatEndedEvent","liveChatId":"chat-fixture","publishedAt":"2026-08-10T12:00:03Z"}}
+      ]
+    }
+  ]
+}

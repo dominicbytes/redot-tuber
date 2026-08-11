@@ -1,0 +1,24 @@
+; Redot-Tuber development and test project.
+; Runtime users install only addons/redot-tuber in their own project.
+
+config_version=5
+
+[application]
+
+config/name="Redot Tuber Development"
+config/features=PackedStringArray("4.5")
+run/main_scene="res://examples/read_only_demo.tscn"
+
+[display]
+
+window/size/viewport_width=960
+window/size/viewport_height=540
+
+[editor_plugins]
+
+enabled=PackedStringArray("redot-tuber")
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"

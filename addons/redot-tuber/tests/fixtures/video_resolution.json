@@ -1,0 +1,40 @@
+{
+  "valid": {
+    "kind": "youtube#videoListResponse",
+    "items": [{
+      "id": "valid-video",
+      "snippet": {"title": "Fixture Live", "liveBroadcastContent": "live"},
+      "liveStreamingDetails": {
+        "actualStartTime": "2026-08-10T12:00:00Z",
+        "activeLiveChatId": "fixture-chat"
+      }
+    }]
+  },
+  "missing": {"kind": "youtube#videoListResponse", "items": []},
+  "disabled": {
+    "kind": "youtube#videoListResponse",
+    "items": [{
+      "id": "disabled-video",
+      "snippet": {"title": "No Chat", "liveBroadcastContent": "live"},
+      "liveStreamingDetails": {"actualStartTime": "2026-08-10T12:00:00Z"}
+    }]
+  },
+  "ended": {
+    "kind": "youtube#videoListResponse",
+    "items": [{
+      "id": "ended-video",
+      "snippet": {"title": "Finished", "liveBroadcastContent": "none"},
+      "liveStreamingDetails": {
+        "actualStartTime": "2026-08-10T10:00:00Z",
+        "actualEndTime": "2026-08-10T11:00:00Z"
+      }
+    }]
+  },
+  "denied": {
+    "error": {
+      "code": 403,
+      "message": "Access denied for fixture",
+      "errors": [{"reason": "forbidden", "domain": "youtube.video"}]
+    }
+  }
+}
