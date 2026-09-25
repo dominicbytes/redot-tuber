@@ -12,5 +12,18 @@
       "status": "built_protocol_tested_secret_service_desktop_certification_pending",
       "sha256": "1d37de51bee014193cdd4c93e9703d2d2c89a70a9243293c212458c32403a5dd"
     }
+  },
+  "stream_helpers": {
+    "protocol": "RTSL/1",
+    "windows-x86_64": {
+      "path": "windows/x86_64/redot-tuber-stream-helper.exe",
+      "status": "built_local_grpc_fixture_and_redot_26_3_tested_live_google_pending",
+      "sha256": "2775b07fc031d463e5dc8dbffae98e491deb3cdffb2b20072967cd6bfb0065d0"
+    },
+    "linux-x86_64": {
+      "path": "linux/x86_64/redot-tuber-stream-helper",
+      "status": "cross_built_local_linux_runtime_pending",
+      "sha256": "2766dabec34b2fa68afdc5febbbbd89502749fc25f78ad25a4b10125f0c7588f"
+    }
   }
 }

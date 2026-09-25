@@ -2,12 +2,12 @@
 
 Redot Tuber is a standalone, typed-GDScript YouTube Live addon for Redot. It lets a game use a developer-owned YouTube Data API application, ask a consenting channel owner to connect their account at runtime, receive typed live events, and perform capability-gated YouTube Live actions.
 
-This implementation is complete on Redot `26.2.stable.official.4f5b14aba`. It includes:
+This development implementation targets Redot `26.3-rc.1`. Runtime regression testing is separate from editor/export certification; the independently reproduced 26.3 headless-editor crash remains a release blocker. It includes:
 
 - public API-key discovery and live-chat reads;
 - Google installed-app OAuth with PKCE, state validation, and an IPv4 loopback callback;
 - persistent per-game/per-account sessions backed by Windows Credential Manager or Linux Secret Service, with no plaintext token fallback;
-- preferred incremental `streamList` delivery with compliant `list` polling fallback;
+- interval-respecting `list` polling by default, with an opt-in native gRPC `streamList` helper for Windows/Linux x86-64 and explicit polling fallback;
 - typed messages, Super Chats/Stickers, memberships, gifts, polls, moderation, system, and unknown events;
 - chat and poll writes, moderation and moderator management, broadcast/stream CRUD, binding, transitions, cuepoints, and recent Super Chat history;
 - capability/scope checks, explicit destructive-action confirmation, quota budgets, redacted diagnostics, and a bounded optional media cache;
@@ -17,7 +17,7 @@ This is currently a development build, not a certified stable release. Real Goog
 
 ## Try the integration lab
 
-1. Open this folder in Redot 26.2 and enable **Redot Tuber** in plugin settings.
+1. Open this folder in Redot 26.3 and enable **Redot Tuber** in plugin settings; note the editor compatibility blocker above.
 2. Run the project. The main scene is the integration lab at `examples/read_only_demo.tscn` (the filename is retained for compatibility).
 3. For public reads, enter a restricted developer-owned YouTube Data API key.
 4. For account features, create a Google **Desktop app** OAuth client and follow [OAuth setup](docs/oauth-setup.md).
@@ -32,6 +32,9 @@ Never place API keys, OAuth tokens, client secrets, or stream ingestion names in
 - [API reference](docs/api-reference.md)
 - [Capability matrix](docs/capability-matrix.md)
 - [Data lifecycle](docs/data-lifecycle.md)
+- [Credential helper export layout](docs/helper-export.md)
+- [Native stream helper build and protocol](native/stream-helper/README.md)
+- [Current Redot 26.3 validation](docs/validation-26.3.md)
 - [Development release readiness](docs/release-readiness.md)
 - [Implementation plan and status](docs/gamedev/implementation-plan.md)
 - [Twitcher reuse manifest](docs/lineage/twitcher-reuse.md)

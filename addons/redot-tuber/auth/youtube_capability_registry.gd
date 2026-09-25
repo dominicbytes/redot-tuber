@@ -9,7 +9,7 @@ const METHOD_DEFINITIONS: Dictionary = {
 	"videos.list": {"capability":"discovery.read", "scope":READONLY_SCOPE, "quota_units":1},
 	"search.list": {"capability":"discovery.read", "scope":READONLY_SCOPE, "quota_units":1, "quota_bucket":"search_queries"},
 	"liveChatMessages.list": {"capability":"chat.read", "scope":READONLY_SCOPE, "quota_units":1},
-	"liveChatMessages.streamList": {"capability":"chat.read", "scope":READONLY_SCOPE, "quota_units":1},
+	"liveChatMessages.streamList": {"capability":"chat.read", "scope":READONLY_SCOPE, "quota_units":1, "availability":"Windows/Linux x86-64 native helper; other platforms use list polling"},
 	"liveChatMessages.insert": {"capability":"chat.write", "scope":FORCE_SSL_SCOPE, "quota_units":50, "oauth":true, "write":true},
 	"liveChatMessages.transition": {"capability":"poll.manage", "scope":FORCE_SSL_SCOPE, "quota_units":50, "oauth":true, "write":true, "confirm":true},
 	"liveChatMessages.delete": {"capability":"moderation.delete_message", "scope":FORCE_SSL_SCOPE, "quota_units":50, "oauth":true, "write":true, "confirm":true},

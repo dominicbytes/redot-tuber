@@ -2,6 +2,7 @@ class_name YouTubeCredentialHelperClient
 extends RefCounted
 
 const ProtocolClass = preload("res://addons/redot-tuber/auth/youtube_credential_protocol.gd")
+const HelperPaths = preload("res://addons/redot-tuber/auth/credential_helper_paths.gd")
 const DEFAULT_TIMEOUT_MSEC: int = 15000
 const MAX_RESPONSE_BYTES: int = 16 * 1024
 
@@ -35,15 +36,7 @@ func delete(target: String, cancellation: YouTubeCancellationToken = null) -> Yo
 func resolved_helper_path() -> String:
 	if not helper_path_override.is_empty():
 		return ProjectSettings.globalize_path(helper_path_override) if helper_path_override.begins_with("res://") else helper_path_override
-	var relative: String = ""
-	match OS.get_name():
-		"Windows":
-			relative = "res://addons/redot-tuber/bin/windows/x86_64/redot-tuber-credential-helper.exe"
-		"Linux":
-			relative = "res://addons/redot-tuber/bin/linux/x86_64/redot-tuber-credential-helper"
-		_:
-			return ""
-	return ProjectSettings.globalize_path(relative)
+	return HelperPaths.runtime_path(OS.has_feature("editor"), OS.get_name(), Engine.get_architecture_name(), OS.get_executable_path())
 
 
 func _invoke(command: String, target: String, secret: String, cancellation: YouTubeCancellationToken) -> YouTubeCredentialResult:

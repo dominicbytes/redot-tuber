@@ -66,6 +66,11 @@ func parse_page(payload: Dictionary) -> YouTubeLiveChatPage:
 			var event: YouTubeLiveEvent = _normalizer.normalize(raw)
 			if event != null:
 				page.events.append(event)
+	var active_poll: Variant = payload.get("activePollItem", null)
+	if active_poll is Dictionary:
+		page.active_poll_event = _normalizer.normalize(active_poll)
+		if page.active_poll_event != null:
+			page.events.append(page.active_poll_event)
 	return page
 
 

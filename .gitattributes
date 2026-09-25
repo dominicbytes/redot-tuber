@@ -13,3 +13,8 @@
 *.exe binary
 *.xlsx binary
 addons/redot-tuber/bin/linux/x86_64/redot-tuber-credential-helper binary
+addons/redot-tuber/bin/linux/x86_64/redot-tuber-stream-helper binary
+native/stream-helper/*.go text eol=lf
+native/stream-helper/*.proto text eol=lf
+native/stream-helper/go.mod text eol=lf
+native/stream-helper/go.sum text eol=lf

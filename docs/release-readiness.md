@@ -1,8 +1,10 @@
 # Development release readiness
 
-Version `0.5.0-dev` is a local feature-complete development snapshot for Redot `26.2.stable.official.4f5b14aba`. It is not a stable/public release and does not claim live Google or cross-platform certification.
+Version `0.5.0-dev` is a development snapshot now targeting Redot `26.3-rc.1`. It is not release-certified: the former streaming implementation used the ordinary list endpoint, while the new opt-in native gRPC `streamList` helper has local fixture and exact-Redot runtime evidence. Interval-respecting polling remains the safe default. The independently reproduced 26.3 headless-editor crash, live Google verification, Linux-native helper execution, and clean Windows/Linux exported-game checks remain release gates. See [current validation](validation-26.3.md).
 
 ## Deterministic evidence
+
+The table below is historical 26.2 implementation evidence, not current release qualification. Its old 16-check streaming fixture modeled the wrong HTTP transport and is not counted as proof of native streaming. Current 26.3 native gRPC, helper process, polling-generation, and exported-helper-path evidence is recorded separately in [validation](validation-26.3.md); path tests alone do not establish exported-game compatibility.
 
 | Area | Runner | Result |
 |---|---|---:|
@@ -19,7 +21,7 @@ Version `0.5.0-dev` is a local feature-complete development snapshot for Redot `
 | Incremental stream source, resume/reconnect/cancel/fallback inputs | `run_ms004_stream_harness.gd` | 16 checks |
 | Real loopback REST writes, auth preflight, serialization, quota rejection | `run_ms005_http_harness.gd` | 22 checks |
 
-The combined deterministic suite contains 555 passing assertions. `run_project_check.gd` loads every addon/example GDScript. The integration-lab main scene also completes a bounded headless smoke run without warnings or errors.
+The historical suite reported 555 assertions. Current suite counts must be read from the fresh run logs after remediation. `run_project_check.gd` loads every addon/example GDScript; neither it nor a fixture proves real streaming or editor/export compatibility.
 
 ## Implemented release content
 

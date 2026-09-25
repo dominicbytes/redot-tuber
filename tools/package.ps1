@@ -37,7 +37,9 @@ $includeFiles = @(".gitignore", "CHANGELOG.md", "LICENSE", "project.godot", "REA
 $sourceFiles = @()
 foreach ($directoryName in $includeDirectories) {
     $directoryPath = Join-Path $repositoryRoot $directoryName
-    $sourceFiles += Get-ChildItem -LiteralPath $directoryPath -Recurse -File
+    $sourceFiles += Get-ChildItem -LiteralPath $directoryPath -Recurse -File | Where-Object {
+        $_.FullName -notmatch '[\\/]\.tools[\\/]' -and $_.Name -notmatch '^(?:.*\.test(?:\.exe)?|coverage\.out)$'
+    }
 }
 foreach ($filename in $includeFiles) {
     $sourceFiles += Get-Item -LiteralPath (Join-Path $repositoryRoot $filename)
@@ -58,7 +60,7 @@ try {
         $entry = $archive.CreateEntry($relativePath, [System.IO.Compression.CompressionLevel]::Optimal)
         $entry.LastWriteTime = $sourceFile.LastWriteTimeUtc
         $unixMode = 33261 # regular file, 0755
-        if ($relativePath -ne "addons/redot-tuber/bin/linux/x86_64/redot-tuber-credential-helper") {
+        if ($relativePath -notin @("addons/redot-tuber/bin/linux/x86_64/redot-tuber-credential-helper", "addons/redot-tuber/bin/linux/x86_64/redot-tuber-stream-helper")) {
             $unixMode = 33188 # regular file, 0644
         }
         $entry.ExternalAttributes = [int]($unixMode -shl 16)

@@ -20,7 +20,7 @@ if error == null:
 	var resolution := await youtube.start_events(runtime_live_video_id)
 ```
 
-`start_events()` prefers incremental `streamList` and falls back to compliant polling when `fallback_to_polling` is enabled. Set `prefer_streaming = false` or call `start_polling()` to force polling.
+`start_events()` defaults to interval-respecting polling (`prefer_streaming = false`). Set `prefer_streaming = true` to use the bundled Windows/Linux x86-64 native gRPC `streamList` helper. Missing/failed transport falls back only when `fallback_to_polling` is enabled; authorization, permission, rate-limit, and quota errors do not silently trigger polling. The helper reconnects with the latest opaque cursor and refreshes OAuth before each new RPC. The old HTTP list response was not a supported streaming transport. Native streaming has local fixture evidence but still needs live Google and clean-export certification; see [validation](validation-26.3.md).
 
 For an account connection:
 
@@ -55,7 +55,7 @@ The OAuth client is developer-owned. Do not configure a client secret. See [OAut
 | `disconnect_account(revoke)` | `YouTubeApiError` or `null` | Stop activity, optionally revoke remotely, and delete this slot's local auth data. |
 | `clear_local_data(revoke)` | `YouTubeApiError` or `null` | Disconnect and also clear discovery/media caches. |
 | `resolve_video(video_id)` | `YouTubeLiveChatResolution` | Resolve a known video to its active live chat. |
-| `start_events(video_id)` | `YouTubeLiveChatResolution` | Resolve and start preferred streaming with optional polling fallback. |
+| `start_events(video_id)` | `YouTubeLiveChatResolution` | Resolve and start polling by default; unsupported streaming requests fail explicitly or fall back as configured. |
 | `start_polling(video_id)` | `YouTubeLiveChatResolution` | Resolve and force API-directed polling. |
 | `poll_once()` | `YouTubeLiveChatPage` | Fetch one page for an already selected chat. |
 | `stop_chat(reason)` | `void` | Cancel stream/poll work and clear the active chat selection. |
