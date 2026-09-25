@@ -25,7 +25,7 @@ signal quota_bucket_changed(bucket: String, used_units: int, remaining_units: in
 signal error_occurred(error: YouTubeApiError)
 
 @export var session_slot: String = "default"
-@export var prefer_streaming: bool = true
+@export var prefer_streaming: bool = false
 @export var fallback_to_polling: bool = true
 
 var connection_state: String = "unconfigured"
@@ -52,7 +52,10 @@ var _poll_scheduler: YouTubeLiveChatPollScheduler = null
 var _deduplicator: YouTubeEventDeduplicator = null
 var _cancellation: YouTubeCancellationToken = null
 var _is_polling: bool = false
+var _chat_generation: int = 0
+var _poll_generation: int = 0
 var _stream_should_fallback: bool = false
+var _stream_error_category: String = ""
 var _configured_slot: String = ""
 var _auth: YouTubeAuthManager = null
 var _oauth_api_base_url: String = YouTubeApiClient.DEFAULT_BASE_URL
@@ -267,9 +270,19 @@ func resolve_video(video_id: String) -> YouTubeLiveChatResolution:
 		return unconfigured
 	stop_chat("new video resolution")
 	_cancellation = YouTubeCancellationToken.new()
+	var generation: int = _chat_generation
+	var cancellation: YouTubeCancellationToken = _cancellation
 	_set_state("resolving")
-	var resolution: YouTubeLiveChatResolution = await _videos.resolve_live_chat(video_id, _cancellation)
+	var resolution: YouTubeLiveChatResolution = await _videos.resolve_live_chat(video_id, cancellation)
+	if generation != _chat_generation or cancellation.is_cancelled():
+		var cancelled: YouTubeLiveChatResolution = YouTubeLiveChatResolution.new()
+		cancelled.error = YouTubeApiError.from_transport(ERR_SKIP, "Video resolution was superseded")
+		return cancelled
 	live_chat_resolved.emit(resolution)
+	if generation != _chat_generation or cancellation.is_cancelled():
+		resolution.status = YouTubeLiveChatResolution.STATUS_ERROR
+		resolution.error = YouTubeApiError.from_transport(ERR_SKIP, "Video resolution was cancelled by its listener")
+		return resolution
 	if resolution.is_active():
 		active_video_id = video_id
 		active_live_chat_id = resolution.live_chat_id
@@ -300,6 +313,8 @@ func start_events(video_id: String) -> YouTubeLiveChatResolution:
 			return resolution
 		error_occurred.emit(stream_error)
 		if not fallback_to_polling:
+			resolution.status = YouTubeLiveChatResolution.STATUS_ERROR
+			resolution.error = stream_error
 			_set_state("error")
 			return resolution
 	_begin_polling()
@@ -312,7 +327,13 @@ func poll_once() -> YouTubeLiveChatPage:
 		page.error = YouTubeApiError.invalid("No active live chat is selected")
 		return page
 	var next_token: String = _poll_scheduler.next_page_token()
-	page = await _chat.list_messages(active_live_chat_id, next_token, 200, _cancellation)
+	var generation: int = _chat_generation
+	var cancellation: YouTubeCancellationToken = _cancellation
+	page = await _chat.list_messages(active_live_chat_id, next_token, 200, cancellation)
+	if generation != _chat_generation or (cancellation != null and cancellation.is_cancelled()):
+		var cancelled: YouTubeLiveChatPage = YouTubeLiveChatPage.new()
+		cancelled.error = YouTubeApiError.from_transport(ERR_SKIP, "Chat request was superseded")
+		return cancelled
 	if page.error != null:
 		error_occurred.emit(page.error)
 		return page
@@ -321,6 +342,8 @@ func poll_once() -> YouTubeLiveChatPage:
 
 
 func stop_chat(reason: String = "stopped") -> void:
+	_chat_generation += 1
+	_poll_generation += 1
 	_is_polling = false
 	_stream_should_fallback = false
 	if _stream_source != null and _stream_source.is_active():
@@ -363,6 +386,7 @@ func _begin_streaming() -> YouTubeApiError:
 		_stream_source.error_occurred.connect(_on_stream_error)
 		_stream_source.stopped.connect(_on_stream_stopped)
 	_stream_should_fallback = fallback_to_polling
+	_stream_error_category = ""
 	var start_error: YouTubeApiError = _stream_source.start(active_live_chat_id, _poll_scheduler.next_page_token(), _cancellation)
 	if start_error != null:
 		_stream_should_fallback = false
@@ -373,14 +397,18 @@ func _begin_streaming() -> YouTubeApiError:
 
 
 func _begin_polling() -> void:
+	if _is_polling:
+		return
 	_stream_should_fallback = false
 	_is_polling = true
+	_poll_generation += 1
 	_set_event_source_mode("polling")
 	_set_state("polling")
-	_poll_loop()
+	_poll_loop(_poll_generation, _cancellation)
 
 
 func _deliver_page(page: YouTubeLiveChatPage, update_poll_schedule: bool) -> void:
+	var generation: int = _chat_generation
 	if update_poll_schedule:
 		var response_contract: Dictionary = {
 			"nextPageToken": page.next_page_token,
@@ -394,11 +422,19 @@ func _deliver_page(page: YouTubeLiveChatPage, update_poll_schedule: bool) -> voi
 		var classification: String = _deduplicator.classify(event)
 		if classification == "new":
 			event_received.emit(event)
+			if generation != _chat_generation:
+				return
 			_emit_typed_event(event, false)
 		elif classification == "update":
 			event_updated.emit(event)
+			if generation != _chat_generation:
+				return
 			_emit_typed_event(event, true)
+		if generation != _chat_generation:
+			return
 	_emit_quota()
+	if generation != _chat_generation:
+		return
 	if page.is_terminal():
 		_is_polling = false
 		_stream_should_fallback = false
@@ -437,24 +473,29 @@ func _on_stream_page(page: YouTubeLiveChatPage) -> void:
 
 
 func _on_stream_error(error: YouTubeApiError) -> void:
+	_stream_error_category = error.category
 	error_occurred.emit(error)
 
 
 func _on_stream_stopped(reason: String) -> void:
 	_set_event_source_mode("stopped")
-	if _stream_should_fallback and reason in ["stream unavailable", "stream framing failed"] and not active_live_chat_id.is_empty():
+	if _stream_should_fallback and reason in ["stream unavailable", "stream framing failed"] and _stream_error_category not in ["authorization", "denied", "quota_exhausted", "rate_limited", "chat_ended", "failed_precondition", "not_found", "invalid_argument"] and not active_live_chat_id.is_empty():
 		_begin_polling()
 		return
 	_stream_should_fallback = false
+	if reason in ["stream unavailable", "stream framing failed", "authorization failed", "quota exhausted"]:
+		_set_state("error")
 
 
-func _poll_loop() -> void:
-	while _is_polling and _cancellation != null and not _cancellation.is_cancelled():
+func _poll_loop(generation: int, cancellation: YouTubeCancellationToken) -> void:
+	while _is_polling and generation == _poll_generation and cancellation != null and not cancellation.is_cancelled():
 		var remaining: int = _poll_scheduler.remaining_msec(Time.get_ticks_msec())
 		if remaining > 0:
 			await get_tree().create_timer(float(remaining) / 1000.0).timeout
 			continue
 		var page: YouTubeLiveChatPage = await poll_once()
+		if generation != _poll_generation or cancellation.is_cancelled():
+			return
 		if page.error != null or page.is_terminal():
 			_is_polling = false
 			break

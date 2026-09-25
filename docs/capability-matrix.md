@@ -11,7 +11,7 @@ Quota values below are local protective accounting. Official Data API read costs
 | `channel.read` | `channels.list` | `youtube.readonly` | 1 | API key or OAuth |
 | `discovery.read` | `videos.list` | `youtube.readonly` | 1 | API key or OAuth |
 | `discovery.read` | `search.list` | `youtube.readonly` | 1 search query | Manual/cached search; never tight-polled |
-| `chat.read` | `liveChatMessages.list`, `streamList` | `youtube.readonly` | 1 estimate/request | Active live chat required |
+| `chat.read` | `liveChatMessages.list`, `liveChatMessages.streamList` | `youtube.readonly` | 1 estimate/request | Active live chat required; native gRPC streaming is opt-in on Windows/Linux x86-64, polling otherwise |
 | `chat.write` | `liveChatMessages.insert` | `youtube.force-ssl` | 50 estimate | Connected account; send text/create poll |
 | `poll.manage` | `liveChatMessages.transition` | `youtube.force-ssl` | 50 estimate | Explicit confirmation; close only |
 | `moderation.delete_message` | `liveChatMessages.delete` | `youtube.force-ssl` | 50 estimate | Explicit confirmation and sufficient privilege |

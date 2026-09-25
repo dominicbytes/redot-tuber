@@ -4,7 +4,7 @@ This contract was checked against official Google/YouTube documentation on 2026-
 
 ## Transport decision
 
-- `liveChatMessages.streamList` is represented as a sequence of JSON response objects. The offline framer accepts arbitrary byte boundaries, multiple responses per chunk, whitespace between responses, UTF-8 content, cancellation, and a fixed maximum buffered-byte limit.
+- Historical fixture assumption (not a verified service protocol): `liveChatMessages.streamList` was represented as a sequence of JSON response objects. The offline framer accepts arbitrary byte boundaries, multiple responses per chunk, whitespace between responses, UTF-8 content, cancellation, and a fixed maximum buffered-byte limit. Passing this fixture does not prove compatibility with Google's documented streaming RPC; the production streaming transport remains blocked.
 - `nextPageToken` is the resume cursor. A reconnect starts from the last completely parsed response; partial response bytes are never treated as a new cursor.
 - This proves the parser and state contract only. It does not certify Redot's live HTTP wire behavior against Google. Until that live gate passes, the public client must be able to use `liveChatMessages.list`.
 - Polling stores the returned `nextPageToken` and never permits the next call before `pollingIntervalMillis`. `offlineAt` and `chatEndedEvent` are terminal.

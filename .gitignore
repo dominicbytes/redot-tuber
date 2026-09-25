@@ -1,4 +1,5 @@
 .godot/
 .test-output/
 dist/
+.tools/
 *.log

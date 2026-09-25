@@ -1,7 +1,13 @@
 class_name YouTubeLiveChatStreamSource
 extends Node
+## Native gRPC sidecar. A private stdin request and bounded nonblocking stdout
+## frames keep credentials out of process arguments, files, and diagnostics.
 
-const FramerClass = preload("res://addons/redot-tuber/transport/json_stream_framer.gd")
+const HelperPaths = preload("res://addons/redot-tuber/transport/stream_helper_paths.gd")
+const PROTOCOL: String = "RTSL/1"
+const MAX_REQUEST_BYTES: int = 16 * 1024
+const MAX_FRAMES_PER_TICK: int = 16
+const MAX_BYTES_PER_TICK: int = 256 * 1024
 
 signal page_received(page: YouTubeLiveChatPage)
 signal reconnecting(attempt: int, delay_msec: int, page_token: String)
@@ -15,25 +21,21 @@ signal stopped(reason: String)
 @export_range(10, 60000, 10) var reconnect_base_delay_msec: int = 500
 @export_range(10, 120000, 10) var reconnect_max_delay_msec: int = 10000
 
+var helper_path_override: String = ""
+var test_loopback_endpoint: String = "" # Editor-only integration fixture.
 var _api: YouTubeApiClient = null
 var _chat: YouTubeLiveChatService = null
 var _gate: YouTubeCapabilityGate = null
-var _client: HTTPClient = null
-var _framer: YouTubeJsonStreamFramer = null
+var _chat_id: String = ""
+var _cursor: String = ""
 var _cancellation: YouTubeCancellationToken = null
-var _live_chat_id: String = ""
-var _page_token: String = ""
-var _host: String = ""
-var _port: int = 0
-var _request_path: String = ""
-var _secure: bool = false
 var _active: bool = false
-var _request_sent: bool = false
-var _request_starting: bool = false
-var _response_seen: bool = false
-var _reconnect_attempt: int = 0
-var _reconnect_at_msec: int = 0
-var _last_receive_msec: int = 0
+var _generation: int = 0
+var _attempt: int = 0
+var _pid: int = -1
+var _stdio: FileAccess = null
+var _stderr: FileAccess = null
+var _buffer: PackedByteArray = PackedByteArray()
 
 
 func configure(api_client: YouTubeApiClient, chat_service: YouTubeLiveChatService, capability_gate: YouTubeCapabilityGate = null) -> void:
@@ -42,47 +44,40 @@ func configure(api_client: YouTubeApiClient, chat_service: YouTubeLiveChatServic
 	_gate = capability_gate
 
 
-func start(
-	live_chat_id: String,
-	page_token: String = "",
-	cancellation: YouTubeCancellationToken = null
-) -> YouTubeApiError:
-	if _active:
-		return YouTubeApiError.invalid("The YouTube live chat stream source is already active")
-	if _api == null or _chat == null:
-		return YouTubeApiError.custom("stream_unconfigured", "Configure the YouTube live chat stream source before starting")
-	if live_chat_id.strip_edges().is_empty():
-		return YouTubeApiError.invalid("Live chat ID is required")
+func start(live_chat_id: String, page_token: String = "", cancellation: YouTubeCancellationToken = null) -> YouTubeApiError:
+	stop("superseded")
+	if live_chat_id.is_empty() or _api == null or _chat == null:
+		return YouTubeApiError.invalid("A configured live chat is required for streamList")
 	if _gate != null:
 		var gate_error: YouTubeApiError = _gate.require_method("liveChatMessages.streamList")
 		if gate_error != null:
 			return gate_error
-	_live_chat_id = live_chat_id
-	_page_token = page_token
-	_cancellation = cancellation if cancellation != null else YouTubeCancellationToken.new()
-	if not _cancellation.cancelled.is_connected(_on_cancelled):
-		_cancellation.cancelled.connect(_on_cancelled, CONNECT_ONE_SHOT)
+	var path: String = resolved_helper_path()
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return YouTubeApiError.custom("stream_transport_unavailable", "Native YouTube stream helper is unavailable for this platform")
+	if not test_loopback_endpoint.is_empty() and not OS.has_feature("editor"):
+		return YouTubeApiError.invalid("Test stream endpoint is editor-only")
+	_chat_id = live_chat_id
+	_cursor = page_token
+	_cancellation = cancellation
 	_active = true
-	_reconnect_attempt = 0
-	_framer = FramerClass.new(max_partial_frame_bytes)
-	var url_error: YouTubeApiError = _prepare_url()
-	if url_error != null:
-		_active = false
-		return url_error
+	_attempt = 0
+	_generation += 1
 	set_process(true)
-	_open_connection()
+	_connect.call_deferred(_generation)
 	return null
 
 
 func stop(reason: String = "stopped") -> void:
-	if not _active:
-		return
+	var was_active: bool = _active
 	_active = false
+	_generation += 1
+	_close_process()
+	_chat_id = ""
+	_cancellation = null
 	set_process(false)
-	_close_client()
-	if _framer != null:
-		_framer.reset()
-	stopped.emit(reason)
+	if was_active:
+		stopped.emit(reason)
 
 
 func is_active() -> bool:
@@ -90,177 +85,211 @@ func is_active() -> bool:
 
 
 func next_page_token() -> String:
-	return _page_token
+	return _cursor
+
+
+func resolved_helper_path() -> String:
+	if not helper_path_override.is_empty():
+		return ProjectSettings.globalize_path(helper_path_override) if helper_path_override.begins_with("res://") else helper_path_override
+	return HelperPaths.runtime_path(OS.has_feature("editor"), OS.get_name(), Engine.get_architecture_name(), OS.get_executable_path())
+
+
+func _connect(generation: int) -> void:
+	if not _current(generation):
+		return
+	var auth_error: YouTubeApiError = await _api.prepare_authorized_request()
+	if not _current(generation):
+		return
+	if auth_error != null:
+		_fail(auth_error, "authorization failed")
+		return
+	var quota_error: YouTubeApiError = _api.begin_external_request("liveChatMessages.streamList")
+	if quota_error != null:
+		_fail(quota_error, "quota exhausted")
+		return
+	var credential: Dictionary = _api.stream_credential()
+	if credential.is_empty():
+		_fail(YouTubeApiError.custom("authorization", "A YouTube credential is required"), "authorization failed")
+		return
+	var request: Dictionary = {
+		"protocol": PROTOCOL,
+		"auth_kind": credential["auth_kind"],
+		"credential": credential["credential"],
+		"live_chat_id": _chat_id,
+		"page_token": _cursor,
+		"idle_timeout_ms": clampi(idle_timeout_msec, 1000, 300000),
+	}
+	credential.clear()
+	var arguments: PackedStringArray = PackedStringArray()
+	if not test_loopback_endpoint.is_empty():
+		request["endpoint"] = test_loopback_endpoint
+		arguments.append("--test-loopback")
+	var wire: String = JSON.stringify(request) + "\n"
+	request.clear()
+	if wire.to_utf8_buffer().size() > MAX_REQUEST_BYTES:
+		wire = ""
+		_fail(YouTubeApiError.invalid("Stream request exceeds the helper protocol limit"), "stream unavailable")
+		return
+	var process: Dictionary = OS.execute_with_pipe(resolved_helper_path(), arguments, false)
+	_stdio = process.get("stdio", null)
+	_stderr = process.get("stderr", null)
+	_pid = int(process.get("pid", -1))
+	if _stdio == null or _pid <= 0:
+		wire = ""
+		_fail(YouTubeApiError.custom("stream_transport_unavailable", "Native stream helper could not start"), "stream unavailable")
+		return
+	_stdio.store_string(wire)
+	_stdio.flush()
+	wire = ""
+	_buffer.clear()
 
 
 func _process(_delta: float) -> void:
 	if not _active:
 		return
 	if _cancellation != null and _cancellation.is_cancelled():
-		stop(_cancellation.reason())
+		stop("cancelled")
 		return
-	var now: int = Time.get_ticks_msec()
-	if _client == null:
-		if now >= _reconnect_at_msec:
-			_open_connection()
+	if _stdio == null:
 		return
-	var poll_error: Error = _client.poll()
-	if poll_error != OK:
-		_schedule_reconnect("HTTPClient poll failed: %s" % error_string(poll_error))
+	var available: int = _stdio.get_length()
+	var budget: int = MAX_FRAMES_PER_TICK
+	var byte_budget: int = MAX_BYTES_PER_TICK
+	budget = _drain_buffer(budget)
+	if _stdio == null:
 		return
-	var status: int = _client.get_status()
-	if status == HTTPClient.STATUS_CONNECTED and not _request_sent and not _request_starting:
-		_send_request()
+	if budget > 0 and _buffer.size() > max_partial_frame_bytes:
+		_fail(YouTubeApiError.custom("stream_framing", "Native stream frame exceeded the size limit"), "stream framing failed")
 		return
-	if _client != null and _client.has_response() and not _response_seen:
-		_response_seen = true
-		var status_code: int = _client.get_response_code()
-		if status_code < 200 or status_code >= 300:
-			var api_error: YouTubeApiError = YouTubeApiError.from_http(status_code, {})
-			if api_error.is_retryable:
-				_schedule_reconnect(api_error.message)
-			else:
-				error_occurred.emit(api_error)
-				stop("stream request rejected")
-			return
-	if _client != null and _client.get_status() == HTTPClient.STATUS_BODY:
-		_read_available_body()
-		if not _active:
-			return
-		now = Time.get_ticks_msec()
-		if now - _last_receive_msec > idle_timeout_msec:
-			_schedule_reconnect("YouTube stream was idle beyond the configured timeout")
-		return
-	if _request_sent and status == HTTPClient.STATUS_DISCONNECTED:
-		_schedule_reconnect("YouTube stream connection closed")
-
-
-func _send_request() -> void:
-	_request_starting = true
-	var authorization_error: YouTubeApiError = await _api.prepare_authorized_request()
-	if not _active or _client == null:
-		_request_starting = false
-		return
-	if authorization_error != null:
-		_request_starting = false
-		error_occurred.emit(authorization_error)
-		stop("authorization unavailable")
-		return
-	var quota_error: YouTubeApiError = _api.begin_external_request("liveChatMessages.streamList")
-	if quota_error != null:
-		_request_starting = false
-		error_occurred.emit(quota_error)
-		stop("quota budget unavailable")
-		return
-	var headers: PackedStringArray = _api.request_headers()
-	headers.append("Accept-Encoding: identity")
-	headers.append("Cache-Control: no-cache")
-	var request_error: Error = _client.request(HTTPClient.METHOD_GET, _request_path, headers)
-	_request_starting = false
-	if request_error != OK:
-		_schedule_reconnect("Unable to start YouTube stream request: %s" % error_string(request_error))
-		return
-	_request_sent = true
-	_last_receive_msec = Time.get_ticks_msec()
-
-
-func _read_available_body() -> void:
-	for _read_index: int in 8:
-		var chunk: PackedByteArray = _client.read_response_body_chunk()
+	while available > 0 and budget > 0 and byte_budget > 0 and _active:
+		var room: int = max_partial_frame_bytes + 1 - _buffer.size()
+		var chunk: PackedByteArray = _stdio.get_buffer(mini(mini(available, read_chunk_bytes), mini(byte_budget, room)))
 		if chunk.is_empty():
 			break
-		_last_receive_msec = Time.get_ticks_msec()
-		var frames: Array[Dictionary] = _framer.push_chunk(chunk)
-		if not _framer.last_error().is_empty():
-			var framing_error: YouTubeApiError = YouTubeApiError.custom("stream_framing", _framer.last_error())
-			error_occurred.emit(framing_error)
-			stop("stream framing failed")
+		byte_budget -= chunk.size()
+		_buffer.append_array(chunk)
+		budget = _drain_buffer(budget)
+		if _stdio == null:
 			return
-		for payload: Dictionary in frames:
+		if budget > 0 and _buffer.size() > max_partial_frame_bytes:
+			_fail(YouTubeApiError.custom("stream_framing", "Native stream frame exceeded the size limit"), "stream framing failed")
+			return
+		available = _stdio.get_length()
+	if budget == 0:
+		return
+	if _pid > 0 and not OS.is_process_running(_pid):
+		if _stdio.get_length() == 0:
+			if not _buffer.is_empty():
+				_fail(YouTubeApiError.custom("stream_framing", "Native stream ended with an incomplete frame"), "stream framing failed")
+				return
+			_retry_or_stop("unavailable")
+
+
+func _drain_buffer(budget: int) -> int:
+	while budget > 0:
+		var end: int = _buffer.find(10)
+		if end < 0:
+			break
+		var line: PackedByteArray = _buffer.slice(0, end)
+		_buffer = _buffer.slice(end + 1)
+		budget -= 1
+		_accept_frame(line)
+		if _stdio == null or not _active:
+			break
+	return budget
+
+
+func _accept_frame(bytes: PackedByteArray) -> void:
+	if bytes.size() > max_partial_frame_bytes:
+		_fail(YouTubeApiError.custom("stream_framing", "Native stream frame exceeded the size limit"), "stream framing failed")
+		return
+	var parser: JSON = JSON.new()
+	if parser.parse(bytes.get_string_from_utf8()) != OK or not parser.data is Dictionary:
+		_fail(YouTubeApiError.custom("stream_framing", "Native stream response was invalid"), "stream framing failed")
+		return
+	var parsed: Dictionary = parser.data
+	if parsed.get("protocol", "") != PROTOCOL:
+		_fail(YouTubeApiError.custom("stream_framing", "Native stream response was invalid"), "stream framing failed")
+		return
+	var frame: Dictionary = parsed
+	match String(frame.get("kind", "")):
+		"page":
+			var payload: Variant = frame.get("page", null)
+			if not payload is Dictionary:
+				_fail(YouTubeApiError.custom("stream_framing", "Native stream page was invalid"), "stream framing failed")
+				return
 			var page: YouTubeLiveChatPage = _chat.parse_page(payload)
 			if not page.next_page_token.is_empty():
-				_page_token = page.next_page_token
-			_reconnect_attempt = 0
+				_cursor = page.next_page_token
+			_attempt = 0
+			var generation: int = _generation
 			page_received.emit(page)
+			if not _current(generation):
+				return
 			if page.is_terminal():
 				stop("chat ended")
-				return
+		"terminal":
+			stop("chat ended")
+		"eof":
+			_retry_or_stop("unavailable")
+		"error":
+			var code: String = String(frame.get("code", ""))
+			if code not in ["canceled", "unknown", "invalid_argument", "deadline_exceeded", "not_found", "already_exists", "permission_denied", "resource_exhausted", "failed_precondition", "aborted", "out_of_range", "unimplemented", "internal", "unavailable", "data_loss", "unauthenticated", "protocol_error", "schema_error", "mapping_error"]:
+				code = "unknown"
+			if code in ["unauthenticated", "permission_denied", "resource_exhausted", "failed_precondition", "not_found", "invalid_argument", "protocol_error", "schema_error", "mapping_error"]:
+				var category: String = {"unauthenticated":"authorization", "permission_denied":"denied", "resource_exhausted":"rate_limited"}.get(code, code)
+				var api_error: YouTubeApiError = YouTubeApiError.custom(category, "YouTube streamList failed (%s)" % code)
+				var reason: String = String(frame.get("reason", ""))
+				if code == "failed_precondition" and reason in ["LIVE_CHAT_DISABLED", "LIVE_CHAT_ENDED"]:
+					api_error.reasons.append(reason)
+				_fail(api_error, "stream unavailable")
+			else:
+				_retry_or_stop(code)
+		_:
+			_fail(YouTubeApiError.custom("stream_framing", "Native stream response type was invalid"), "stream framing failed")
 
 
-func _prepare_url() -> YouTubeApiError:
-	var url: String = _api.build_url("/liveChat/messages", {
-		"liveChatId": _live_chat_id,
-		"part": "id,snippet,authorDetails",
-		"maxResults": 2000,
-		"pageToken": _page_token,
-	})
-	_secure = url.begins_with("https://")
-	var scheme_marker: int = url.find("://")
-	if scheme_marker < 0:
-		return YouTubeApiError.invalid("YouTube stream URL has no scheme")
-	var remainder: String = url.substr(scheme_marker + 3)
-	var slash_index: int = remainder.find("/")
-	var authority: String = remainder if slash_index < 0 else remainder.substr(0, slash_index)
-	_request_path = "/" if slash_index < 0 else remainder.substr(slash_index)
-	_host = authority
-	_port = 443 if _secure else 80
-	var colon_index: int = authority.rfind(":")
-	if colon_index > 0:
-		_host = authority.substr(0, colon_index)
-		_port = int(authority.substr(colon_index + 1))
-	if _host.is_empty() or _port <= 0:
-		return YouTubeApiError.invalid("YouTube stream URL has an invalid host or port")
-	return null
-
-
-func _open_connection() -> void:
-	_close_client()
+func _retry_or_stop(code: String) -> void:
+	_close_process()
 	if not _active:
 		return
-	var url_error: YouTubeApiError = _prepare_url()
-	if url_error != null:
-		error_occurred.emit(url_error)
-		stop("stream URL invalid")
+	if _attempt >= max_reconnect_attempts:
+		_fail(YouTubeApiError.custom("stream_transport_unavailable", "YouTube streamList stopped after bounded retries (%s)" % code), "stream unavailable")
 		return
-	_client = HTTPClient.new()
-	_client.set_read_chunk_size(read_chunk_bytes)
-	_request_sent = false
-	_request_starting = false
-	_response_seen = false
-	_framer.reset()
-	var connect_error: Error
-	if _secure:
-		connect_error = _client.connect_to_host(_host, _port, TLSOptions.client())
-	else:
-		connect_error = _client.connect_to_host(_host, _port)
-	if connect_error != OK:
-		_schedule_reconnect("Unable to connect to YouTube stream: %s" % error_string(connect_error))
-
-
-func _schedule_reconnect(reason: String) -> void:
-	_close_client()
-	if not _active:
+	_attempt += 1
+	var delay: int = mini(reconnect_max_delay_msec, reconnect_base_delay_msec * (1 << mini(_attempt - 1, 10)))
+	var generation: int = _generation
+	reconnecting.emit(_attempt, delay, _cursor)
+	if not _current(generation):
 		return
-	_reconnect_attempt += 1
-	if _reconnect_attempt > max_reconnect_attempts:
-		var error: YouTubeApiError = YouTubeApiError.custom("stream_unavailable", "%s after %d reconnect attempts" % [reason, max_reconnect_attempts], true)
-		error_occurred.emit(error)
-		stop("stream unavailable")
-		return
-	var delay: int = mini(reconnect_max_delay_msec, reconnect_base_delay_msec * (1 << (_reconnect_attempt - 1)))
-	_reconnect_at_msec = Time.get_ticks_msec() + delay
-	reconnecting.emit(_reconnect_attempt, delay, _page_token)
+	await get_tree().create_timer(float(delay) / 1000.0).timeout
+	if _current(generation):
+		_connect(generation)
 
 
-func _close_client() -> void:
-	if _client != null:
-		_client.close()
-	_client = null
+func _fail(error: YouTubeApiError, reason: String) -> void:
+	var generation: int = _generation
+	error_occurred.emit(error)
+	if _current(generation):
+		stop(reason)
 
 
-func _on_cancelled(reason: String) -> void:
-	stop(reason)
+func _current(generation: int) -> bool:
+	return _active and generation == _generation and (_cancellation == null or not _cancellation.is_cancelled())
+
+
+func _close_process() -> void:
+	if _pid > 0 and OS.is_process_running(_pid):
+		OS.kill(_pid)
+	_pid = -1
+	if _stdio != null:
+		_stdio.close()
+		_stdio = null
+	if _stderr != null:
+		_stderr.close()
+		_stderr = null
+	_buffer.clear()
 
 
 func _exit_tree() -> void:
-	stop("stream source freed")
+	stop("source freed")

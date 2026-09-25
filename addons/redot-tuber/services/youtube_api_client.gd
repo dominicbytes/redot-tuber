@@ -42,6 +42,14 @@ func request_headers() -> PackedStringArray:
 	return headers
 
 
+func stream_credential() -> Dictionary:
+	if not _access_token.is_empty():
+		return {"auth_kind": "oauth", "credential": _access_token}
+	if not _api_key.is_empty():
+		return {"auth_kind": "api_key", "credential": _api_key}
+	return {}
+
+
 func begin_external_request(method_id: String) -> YouTubeApiError:
 	if _quota_ledger == null:
 		return null
