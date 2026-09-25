@@ -13,6 +13,8 @@
 
 The GitHub native-helper workflow runs Windows/Linux tests, Linux's race detector, and reproducible-build comparisons against the bundled binaries. Its result is separate from these local checks; inspect the workflow for the tested commit. Linux CI does not certify Redot game exports or desktop Secret Service.
 
+Published source `87fbab9117d7627b97214a5f61c63919f7ce4d22` passed [both native CI jobs](https://github.com/dominicbytes/redot-tuber/actions/runs/36080641898): Windows/Linux gRPC/process tests, Linux race detection, and byte-for-byte rebuilt helper comparisons. This closes the native-helper Linux execution/reproducibility gate, not the Redot export or live-service gates below.
+
 ## Transport policy
 
 A 90-second no-response watchdog and three reconnect attempts bound a stalled transport. A valid response resets the retry counter. If all attempts remain silent/fail, configured polling fallback takes over; with fallback disabled, an explicit transport error stops reception. Silence is not proof of chat end, and no undocumented server heartbeat is assumed. Authorization, permission, quota and rate-limit failures do not silently fall back. A single helper process also has a 24-hour lifetime cap.

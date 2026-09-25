@@ -1,6 +1,6 @@
 # Development release readiness
 
-Version `0.5.0-dev` is a development snapshot now targeting Redot `26.3-rc.1`. It is not release-certified: the former streaming implementation used the ordinary list endpoint, while the new opt-in native gRPC `streamList` helper has local fixture and exact-Redot runtime evidence. Interval-respecting polling remains the safe default. The independently reproduced 26.3 headless-editor crash, live Google verification, Linux-native helper execution, and clean Windows/Linux exported-game checks remain release gates. See [current validation](validation-26.3.md).
+Version `0.5.0-dev` is a development snapshot now targeting Redot `26.3-rc.1`. It is not release-certified: the former streaming implementation used the ordinary list endpoint, while the new opt-in native gRPC `streamList` helper has local fixture and exact-Redot runtime evidence, plus passing Windows/Linux native CI and reproducible binaries. Interval-respecting polling remains the safe default. The independently reproduced 26.3 headless-editor crash, live Google verification, and clean Windows/Linux exported-game checks remain release gates. See [current validation](validation-26.3.md).
 
 ## Deterministic evidence
 
