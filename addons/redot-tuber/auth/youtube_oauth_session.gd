@@ -120,12 +120,13 @@ func consume_exchange_parameters(code: String, redirect_uri: String) -> Dictiona
 	return parameters
 
 
-func cancel_authorization(_reason: String = "cancelled") -> void:
-	if _callback_server != null:
-		_callback_server.stop()
-		_callback_server.queue_free()
-		_callback_server = null
+func cancel_authorization(reason: String = "cancelled") -> void:
+	var server: YouTubeLoopbackCallbackServer = _callback_server
+	_callback_server = null
 	_clear_pending_secrets()
+	if server != null:
+		server.cancel(reason)
+		server.queue_free()
 
 
 func requested_capabilities() -> PackedStringArray:

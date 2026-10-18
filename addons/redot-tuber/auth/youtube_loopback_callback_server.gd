@@ -33,6 +33,11 @@ func start(expected_state: String, timeout_msec: int = 180000) -> YouTubeApiErro
 	return null
 
 
+func cancel(reason: String = "cancelled") -> void:
+	if _result == null:
+		_complete_error("cancelled", reason)
+
+
 func stop() -> void:
 	set_process(false)
 	if _peer != null:
