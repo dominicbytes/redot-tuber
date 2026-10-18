@@ -350,8 +350,6 @@ func stop_chat(reason: String = "stopped") -> void:
 		_stream_source.stop(reason)
 	if _cancellation != null:
 		_cancellation.cancel(reason)
-	if _transport != null:
-		_transport.cancel_all(reason)
 	active_video_id = ""
 	active_live_chat_id = ""
 	if _poll_scheduler != null:
@@ -606,3 +604,5 @@ func _set_event_source_mode(next_mode: String) -> void:
 
 func _exit_tree() -> void:
 	stop_chat("client freed")
+	if _transport != null:
+		_transport.cancel_all("client freed")
