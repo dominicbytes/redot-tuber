@@ -25,7 +25,7 @@ func redact_text(value: String) -> String:
 	result = bearer.sub(result, "$1" + REDACTED, true)
 	for key: String in SECRET_KEYS:
 		var expression: RegEx = RegEx.new()
-		expression.compile("(?i)([?&\\s]" + key + "\\s*[=:]\\s*)[^&\\s]+")
+		expression.compile("(?i)((?:^|[?&\\s])" + key + "\\s*[=:]\\s*)[^&\\s]+")
 		result = expression.sub(result, "$1" + REDACTED, true)
 	return result
 

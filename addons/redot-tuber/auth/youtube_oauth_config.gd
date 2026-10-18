@@ -6,6 +6,7 @@ const DEFAULT_TOKEN_ENDPOINT: String = "https://oauth2.googleapis.com/token"
 const DEFAULT_REVOCATION_ENDPOINT: String = "https://oauth2.googleapis.com/revoke"
 
 var client_id: String = ""
+var client_secret: String = ""
 var application_id: String = ""
 var publisher_id: String = ""
 var authorization_endpoint: String = DEFAULT_AUTHORIZATION_ENDPOINT

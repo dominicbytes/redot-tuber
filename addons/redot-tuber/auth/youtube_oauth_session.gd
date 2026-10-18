@@ -116,6 +116,8 @@ func consume_exchange_parameters(code: String, redirect_uri: String) -> Dictiona
 		"grant_type": "authorization_code",
 		"redirect_uri": redirect_uri,
 	}
+	if not _config.client_secret.is_empty():
+		parameters["client_secret"] = _config.client_secret
 	_clear_pending_secrets()
 	return parameters
 

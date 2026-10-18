@@ -92,7 +92,7 @@ func _test_oauth_config(classes: Dictionary) -> void:
 	var property_names: PackedStringArray = PackedStringArray()
 	for property: Dictionary in config.get_property_list():
 		property_names.append(String(property.get("name", "")))
-	_check(not property_names.has("client_secret"), "desktop OAuth config has no client-secret field")
+	_check(property_names.has("client_secret") and config.client_secret.is_empty(), "desktop OAuth client secret is optional")
 	config.authorization_endpoint = "http://example.com/unsafe"
 	_check(config.validate() != null, "non-loopback insecure OAuth endpoint is rejected")
 
