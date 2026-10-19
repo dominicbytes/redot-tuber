@@ -308,6 +308,8 @@ func _current_result(restored: bool) -> YouTubeAuthResult:
 
 
 func _failed(error: YouTubeApiError) -> YouTubeAuthResult:
+	if state in ["authorizing", "exchanging", "restoring"]:
+		_set_state("connected" if channel != null else "configured")
 	var result: YouTubeAuthResult = YouTubeAuthResult.new()
 	result.error = error
 	return result

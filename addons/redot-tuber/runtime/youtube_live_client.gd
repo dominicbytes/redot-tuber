@@ -138,6 +138,8 @@ func complete_account_authorization(code: String) -> YouTubeAuthResult:
 	var result: YouTubeAuthResult = await _auth.complete_authorization(code)
 	if result.is_success():
 		_activate_authorized_api()
+	else:
+		_set_state("connected" if connected_channel != null else "oauth_configured")
 	return result
 
 
@@ -149,6 +151,8 @@ func connect_account() -> YouTubeAuthResult:
 	var result: YouTubeAuthResult = await _auth.authorize_interactive()
 	if result.is_success():
 		_activate_authorized_api()
+	else:
+		_set_state("connected" if connected_channel != null else "oauth_configured")
 	return result
 
 
@@ -160,6 +164,8 @@ func restore_account() -> YouTubeAuthResult:
 	var result: YouTubeAuthResult = await _auth.restore()
 	if result.is_success():
 		_activate_authorized_api()
+	else:
+		_set_state("connected" if connected_channel != null else "oauth_configured")
 	return result
 
 
@@ -542,6 +548,8 @@ func _activate_authorized_api() -> void:
 func _on_auth_state_changed(_previous: String, current: String) -> void:
 	if current in ["authorizing", "exchanging", "restoring"]:
 		_set_state(current)
+	elif current == "configured" and connection_state in ["authorizing", "exchanging", "restoring"]:
+		_set_state("connected" if connected_channel != null else "oauth_configured")
 
 
 func _on_account_connected(channel: YouTubeChannelIdentity, restored: bool) -> void:
