@@ -20,7 +20,7 @@ This is currently a development build, not a certified stable release. Real Goog
 1. Open this folder in Redot 26.3 and enable **Redot Tuber** in plugin settings; note the editor compatibility blocker above.
 2. Run the project. The main scene is the integration lab at `examples/read_only_demo.tscn` (the filename is retained for compatibility).
 3. For public reads, enter a restricted developer-owned YouTube Data API key.
-4. For account features, create a Google **Desktop app** OAuth client and follow [OAuth setup](docs/oauth-setup.md).
+4. For account features, create a Google **Desktop app** OAuth client and set its client ID and client secret in the runtime `YouTubeOAuthConfig` (`client_id` and optional `client_secret`); follow [OAuth setup](docs/oauth-setup.md). Google requires the secret for Desktop app token exchange and refresh even with PKCE, but treats it as non-confidential because installed apps are public clients.
 5. Select only the capabilities your game actually needs. Destructive actions also require the lab's confirmation control.
 
 Never place API keys, OAuth tokens, client secrets, or stream ingestion names in source, scenes, resources, export presets, or `project.godot`.

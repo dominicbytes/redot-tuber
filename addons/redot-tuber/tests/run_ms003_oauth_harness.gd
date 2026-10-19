@@ -53,10 +53,23 @@ func _run() -> void:
 	if listen_error != OK:
 		_finish()
 		return
+	await _test_flow("")
+	await _test_flow("fixture-desktop-secret &+")
+	var redactor: YouTubeRedactor = YouTubeRedactor.new()
+	_check(redactor.redact_dictionary({"client_secret": "fixture-secret"}).client_secret == "[REDACTED]", "dictionary redacts client secret")
+	_check(not redactor.redact_text("client_secret=fixture-secret&client_id=id").contains("fixture-secret"), "form redacts leading client secret")
+	_check(not redactor.redact_text("https://example.invalid/?client_secret=fixture-secret").contains("fixture-secret"), "URL redacts client secret")
+	_close_server()
+	_finish()
+
+
+func _test_flow(client_secret: String) -> void:
+	_requests.clear()
 	var provider: FakeCredentialProvider = FakeCredentialProvider.new()
 	var store: Variant = DescriptorStoreClass.new(TEST_DESCRIPTOR_DIR)
 	store.delete_descriptor("primary")
 	var config: Variant = _make_config()
+	config.client_secret = client_secret
 
 	var first: Node = _make_manager(config, provider, store, "primary")
 	var request: Variant = first.begin_authorization(false, "http://127.0.0.1:49152/oauth2/callback")
@@ -71,11 +84,11 @@ func _run() -> void:
 	var descriptor_path: String = store.path_for_slot("primary")
 	var descriptor_text: String = FileAccess.get_file_as_string(descriptor_path)
 	_check(descriptor_text.contains("fixture-channel"), "non-secret descriptor records channel identity")
-	_check(not descriptor_text.contains(String(provider.values[target])) and not descriptor_text.contains("access-one"), "descriptor excludes access and refresh tokens")
+	_check(not descriptor_text.contains(String(provider.values[target])) and not descriptor_text.contains("access-one") and (client_secret.is_empty() or not descriptor_text.contains(client_secret)), "descriptor excludes access and refresh tokens")
 	var exchange_request: Dictionary = _find_request("/token", "grant_type=authorization_code")
 	_check(not exchange_request.is_empty(), "authorization-code token request reaches endpoint")
 	_check(String(exchange_request.get("body", "")).contains("code_verifier="), "token exchange sends PKCE verifier")
-	_check(not String(exchange_request.get("body", "")).contains("client_secret"), "token exchange has no client secret")
+	_check_secret_form(exchange_request, client_secret, "exchange")
 	first.free()
 	await process_frame
 
@@ -87,6 +100,7 @@ func _run() -> void:
 	_check(String(provider.values.get(target, "")) == "refresh-two", "refresh-token rotation replaces vault value")
 	var refresh_request: Dictionary = _find_request("/token", "grant_type=refresh_token")
 	_check(not refresh_request.is_empty(), "restore uses refresh-token grant")
+	_check_secret_form(refresh_request, client_secret, "restore refresh")
 	var channel_request: Dictionary = _find_request("/youtube/v3/channels", "")
 	_check(String(channel_request.get("headers", "")).contains("Authorization: Bearer"), "authorized channel request uses bearer header")
 
@@ -97,8 +111,14 @@ func _run() -> void:
 	_check(not FileAccess.file_exists(descriptor_path), "disconnect deletes non-secret descriptor")
 	_check(not _find_request("/revoke", "token=").is_empty(), "disconnect calls OAuth revocation endpoint")
 	restored.free()
-	_close_server()
-	_finish()
+
+
+func _check_secret_form(request: Dictionary, secret: String, operation: String) -> void:
+	var body: String = String(request.get("body", ""))
+	if secret.is_empty():
+		_check(not body.contains("client_secret"), operation + " omits empty client secret")
+	else:
+		_check(body.contains("client_secret=" + secret.uri_encode()), operation + " sends encoded desktop client secret")
 
 
 func _make_config() -> Variant:

@@ -12,16 +12,19 @@ func exchange(endpoint: String, parameters: Dictionary, cancellation: YouTubeCan
 	return await _post_token(endpoint, parameters, cancellation)
 
 
-func refresh(endpoint: String, client_id: String, refresh_token: String, cancellation: YouTubeCancellationToken = null) -> YouTubeTokenOperationResult:
+func refresh(endpoint: String, client_id: String, refresh_token: String, cancellation: YouTubeCancellationToken = null, client_secret: String = "") -> YouTubeTokenOperationResult:
 	if client_id.is_empty() or refresh_token.is_empty():
 		var invalid: YouTubeTokenOperationResult = YouTubeTokenOperationResult.new()
 		invalid.error = YouTubeApiError.invalid("Client ID and refresh token are required")
 		return invalid
-	return await _post_token(endpoint, {
+	var parameters: Dictionary = {
 		"client_id": client_id,
 		"grant_type": "refresh_token",
 		"refresh_token": refresh_token,
-	}, cancellation)
+	}
+	if not client_secret.is_empty():
+		parameters["client_secret"] = client_secret
+	return await _post_token(endpoint, parameters, cancellation)
 
 
 func revoke(endpoint: String, token: String, cancellation: YouTubeCancellationToken = null) -> YouTubeTokenOperationResult:
@@ -48,9 +51,6 @@ func _post_token(endpoint: String, parameters: Dictionary, cancellation: YouTube
 	var result: YouTubeTokenOperationResult = YouTubeTokenOperationResult.new()
 	if _transport == null:
 		result.error = YouTubeApiError.from_transport(ERR_UNCONFIGURED, "OAuth transport is unavailable")
-		return result
-	if parameters.has("client_secret"):
-		result.error = YouTubeApiError.invalid("Installed-app OAuth must not send a client secret")
 		return result
 	var ticket: YouTubeHttpTicket = _transport.request(
 		endpoint,

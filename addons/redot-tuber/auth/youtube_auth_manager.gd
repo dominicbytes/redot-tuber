@@ -139,7 +139,7 @@ func restore() -> YouTubeAuthResult:
 		return _failed(credential.error if credential.error != null else YouTubeApiError.custom(credential.status, "Stored credential is unavailable"))
 	var refresh_value: String = credential.secret
 	credential.clear_secret()
-	var operation: YouTubeTokenOperationResult = await _tokens.refresh(_config.token_endpoint, _config.client_id, refresh_value)
+	var operation: YouTubeTokenOperationResult = await _tokens.refresh(_config.token_endpoint, _config.client_id, refresh_value, null, _config.client_secret)
 	if operation.error != null:
 		refresh_value = ""
 		_set_state("configured")
@@ -157,7 +157,7 @@ func refresh_access() -> YouTubeAuthResult:
 		return _failed(credential.error if credential.error != null else YouTubeApiError.custom(credential.status, "Stored credential is unavailable"))
 	var refresh_value: String = credential.secret
 	credential.clear_secret()
-	var operation: YouTubeTokenOperationResult = await _tokens.refresh(_config.token_endpoint, _config.client_id, refresh_value)
+	var operation: YouTubeTokenOperationResult = await _tokens.refresh(_config.token_endpoint, _config.client_id, refresh_value, null, _config.client_secret)
 	if operation.error != null:
 		refresh_value = ""
 		return _failed(operation.error)
